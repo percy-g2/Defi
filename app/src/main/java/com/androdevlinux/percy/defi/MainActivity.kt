@@ -1,7 +1,9 @@
 package com.androdevlinux.percy.defi
 
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -15,6 +17,8 @@ import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.observers.DisposableObserver
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
+import java.util.*
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -41,6 +45,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun getPocketData() {
+        val cal = Calendar.getInstance()
+        val myIntent = Intent(this, MainActivity::class.java)
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pendingIntent = PendingIntent.getService(this, 0, myIntent, 0)
+
+        // get current time
+        val currentTime = Calendar.getInstance()
+
+        // setup time for alarm
+        val alarmTime = Calendar.getInstance()
+
+        // set time-part of alarm
+        alarmTime.set(Calendar.SECOND, 0)
+        alarmTime.set(Calendar.MINUTE, 0)
+        alarmTime.set(Calendar.HOUR, 3)
+        alarmTime.set(Calendar.AM_PM, Calendar.PM)
+        alarmTime.set(Calendar.DAY_OF_WEEK, Calendar.FRIDAY)
+
+        // check if it in the future
+        if (currentTime.getTimeInMillis() < alarmTime.getTimeInMillis()) {
+            // nothing to do - time of alarm in the future
+        } else {
+            var dayDiffBetweenClosestFriday =
+                (7 + cal.get(Calendar.DAY_OF_WEEK) - cal.get(Calendar.DAY_OF_WEEK)) % 7
+
+            if (dayDiffBetweenClosestFriday == 0) {
+                // Today is Friday, but current time after 3pm, so schedule for the next Friday
+                dayDiffBetweenClosestFriday = 7
+            }
+
+            alarmTime.add(Calendar.DAY_OF_MONTH, dayDiffBetweenClosestFriday)
+        }
+
+        // calculate interval (7 days) in ms
+        val interval = 1000 * 60 * 60 * 24 * 7
+
+        alarmManager.setRepeating(
+            AlarmManager.RTC_WAKEUP,
+            alarmTime.getTimeInMillis(),
+            interval.toLong(),
+            pendingIntent
+        )
         pocketBitsBeanObservable = apiManager!!.pocketbitsTicker
         disposables = CompositeDisposable()
         disposables!!.add(pocketBitsBeanObservable!!.subscribeOn(Schedulers.io())
@@ -58,7 +104,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onComplete() {
                     val notificationHelper = NotificationHelper(this@MainActivity)
                     notificationHelper.createNotification( "Defi 2.0", "You should buy some sats/btc this week : - " +  Constants.btc_price ,
-                        Intent(Intent.ACTION_VIEW, Uri.parse("https://pocketbits.in/")) )
+                        myIntent )
                 }
             }))
     }
